@@ -4,7 +4,8 @@ Implementation of the threshold-independent performance measure F1-EV and its bo
 
 ## Instructions
 
-Just run the script and pass the folders containing the predictions and the folder containing the labels as arguments.
+Just run the script and pass the folders containing the predictions and the folder containing the labels as arguments:
+TODO: add example
 
 ## Reference
 
