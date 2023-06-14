@@ -11,8 +11,8 @@ python f1_ev.py -pred_files_path ./path-to-pred-files/ -ref_files_path ./path-to
 
 When reusing (parts of) the code, a reference to the following paper would be appreciated:
 
-@unpublished{wilkinghoff2023design,
-  author = {Wilkinghoff, Kevin},
+@unpublished{wilkinghoff2023f1-ev,
+  author = {Wilkinghoff, Kevin and Imoto, Keisuke},
   title  = {F1-EV Score: Measuring the Likelihood of Estimating a Good Decision Threshold for Semi-Supervised Anomaly Detection},
   note = {Preprint},
   year   = {2023}
