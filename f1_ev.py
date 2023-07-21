@@ -51,7 +51,7 @@ def compute_performance(pred_files_path, ref_files_path):
     f1ev_bounded = np.zeros(len(pred_files))
     estf1 = np.zeros(len(pred_files))
     subf1 = np.zeros(len(pred_files))
-    for k in tqdm(np.arange(len(pred_files))):
+    for k in np.arange(len(pred_files)):
         pred = np.array(pd.read_csv(pred_files_path+pred_files[k]))[:,1].astype(np.float32)
         dec = np.array(pd.read_csv(pred_files_path+dec_files[k]))[:,1].astype(np.float32)
         y_true = np.array(pd.read_csv(ref_files_path+ref_files[k]))[:,1].astype(np.float32)
@@ -69,23 +69,29 @@ def compute_performance(pred_files_path, ref_files_path):
         threshold = np.mean(normal_scores) + alpha*np.std(normal_scores)
         estf1[k] = metrics.f1_score(y_true, pred>threshold)
         # submitted F1-score
-        subf1[k] = metrics.f1_score(y_true, dec)
+        if np.array_equal(dec, dec.astype(bool)):
+            subf1[k] = metrics.f1_score(y_true, dec)
     print('threshold-independent metrics:')
     print('harmonic mean of AUCs: ' + str(hmean(auc)))
     print('harmonic mean of pAUCs: ' + str(hmean(pauc)))
     print('harmonic mean of F1-EVs: ' + str(hmean(f1ev)))
     print('harmonic mean of bounded F1-EVs: ' + str(hmean(f1ev_bounded)))
     print('threshold-dependent metrics:')
-    print('submitted F1-score: ' + str(hmean(subf1)))
-    print('estimated F1-score: ' + str(hmean(estf1)))
-    print('optimal F1-score: ' + str(hmean(maxf1)))
+    print('harmonic mean of submitted F1-scores: ' + str(hmean(subf1)))
+    print('harmonic mean of estimated F1-scores: ' + str(hmean(estf1)))
+    print('harmonic mean of optimal F1-score: ' + str(hmean(maxf1)))
     return
 
 
 if __name__ == "__main__":
-    # example: python f1_ev.py -pred_files_path ./dcase-2022/team_fkie/ -ref_files_path ./dcase-2022/ground_truth_data/
+    # example: python f1_ev.py -pred_files_path ./dcase-2023/teams/ -ref_files_path ./dcase-2023/ground_truth_data/
     parser = argparse.ArgumentParser()
     parser.add_argument('-pred_files_path', type=str, help='path to the folder containing the prediction files')
     parser.add_argument('-ref_files_path', type=str, help='path to the folder containing the ground truth files')
     args = parser.parse_args()
-    compute_performance(args.pred_files_path, args.ref_files_path)
+    for team_dir in tqdm(os.listdir(args.pred_files_path)):
+        print(team_dir)
+        for submission_dir in os.listdir(args.pred_files_path + '/' + team_dir + '/'):
+            print('############')
+            print(submission_dir)
+            compute_performance(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path)
