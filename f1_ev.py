@@ -1,24 +1,31 @@
 import numpy as np
 from sklearn import metrics
-import matplotlib.pyplot as plt
 import argparse
 import pandas as pd
 from tqdm import tqdm
 import os
-from scipy.stats import hmean
+from scipy.stats import hmean, gamma, pearsonr
 
 
-def f1_ev(y_true, pred, bounded=False):
+def estimate_decision_threshold(pred, dec):
+    thresholds = pred[:-1] + np.diff(pred)/2
+    similarities = np.zeros(thresholds.shape[0])
+    for k, threshold in enumerate(thresholds):
+        similarities[k] = np.sum((pred>threshold)==dec)
+    return thresholds[np.argmax(similarities)]
+
+
+def f1_ev(y_true, pred, bounded=False, orig_threshold=None):
     # define thresholds
     thresholds = np.unique(pred)
     if bounded:
         normal_scores = pred[y_true==0]
-        # use Bathia-Davis inequality with sample mean as estimate
-        est_var_bound = (np.max(normal_scores)-np.mean(normal_scores))*(np.mean(normal_scores)-np.min(normal_scores))
-        # define bound for threshold estimated with standard deviation
-        alpha = 1.28
-        est_upper_bound = np.mean(normal_scores)+alpha*np.sqrt(est_var_bound)
-        est_lower_bound = np.mean(normal_scores)
+        anomalous_scores = pred[y_true==1]
+        std_normal = np.std(normal_scores)
+        # define bounds for threshold estimated with standard deviation
+        alpha = 0.25
+        est_upper_bound = np.max([orig_threshold, np.mean(normal_scores)]) + alpha*std_normal
+        est_lower_bound = np.min([orig_threshold, np.mean(normal_scores)]) - alpha*std_normal
         thresholds = np.concatenate([np.expand_dims(est_lower_bound, axis=0), thresholds[(thresholds<est_upper_bound)*(thresholds>est_lower_bound)], np.expand_dims(est_upper_bound, axis=0)], axis=0)
     # compute f1-scores
     f1_scores = np.zeros(thresholds.shape)
@@ -27,10 +34,10 @@ def f1_ev(y_true, pred, bounded=False):
     # integrate using Riemann sum to get expected value of F1 score
     ds = np.diff(thresholds/ (thresholds[-1] - thresholds[0]))
     df1 = f1_scores[:-1]
-    return np.sum(ds*df1), np.max(f1_scores)
+    return np.sum(ds*df1), np.max(f1_scores), thresholds[np.argmax(f1_scores)]
 
 
-def compute_performance(pred_files_path, ref_files_path):
+def compute_performance(pred_files_path, ref_files_path, verbose=False):
     # load predictions
     pred_files = os.listdir(pred_files_path)
     pred_files_cleaned = []
@@ -60,27 +67,30 @@ def compute_performance(pred_files_path, ref_files_path):
         # compute pAUC
         pauc[k] = metrics.roc_auc_score(y_true, pred, max_fpr=0.1)
         # computet F1-EV
-        f1ev[k], maxf1[k] = f1_ev(y_true, pred)
-        # compute bounded F1-EV
-        f1ev_bounded[k], _ = f1_ev(y_true, pred, bounded=True)
-        # estimate threshold and compute F1-score
-        normal_scores = pred[y_true==0]
-        alpha = 1.28
-        threshold = np.mean(normal_scores) + alpha*np.std(normal_scores)
-        estf1[k] = metrics.f1_score(y_true, pred>threshold)
-        # submitted F1-score
+        f1ev[k], maxf1[k], optimal_threshold = f1_ev(y_true, pred)
         if np.array_equal(dec, dec.astype(bool)):
+            # estimate threshold and compute F1-score
+            #threshold = estimate_decision_threshold(pred, dec)  # this would be treshold-dependent
+            threshold = optimal_threshold  # to have a threshold-independent metric!
+            estf1[k] = metrics.f1_score(y_true, pred>threshold)
+            # compute bounded F1-EV
+            f1ev_bounded[k], _, _ = f1_ev(y_true, pred, bounded=True, orig_threshold=threshold)
+            # submitted F1-score
             subf1[k] = metrics.f1_score(y_true, dec)
-    print('threshold-independent metrics:')
-    print('harmonic mean of AUCs: ' + str(hmean(auc)))
-    print('harmonic mean of pAUCs: ' + str(hmean(pauc)))
-    print('harmonic mean of F1-EVs: ' + str(hmean(f1ev)))
-    print('harmonic mean of bounded F1-EVs: ' + str(hmean(f1ev_bounded)))
-    print('threshold-dependent metrics:')
-    print('harmonic mean of submitted F1-scores: ' + str(hmean(subf1)))
-    print('harmonic mean of estimated F1-scores: ' + str(hmean(estf1)))
-    print('harmonic mean of optimal F1-score: ' + str(hmean(maxf1)))
-    return
+    if verbose:
+        print('##########################################')
+        print(pred_files_path)
+        print('##########################################')
+        print('threshold-independent metrics:')
+        print('harmonic mean of AUCs: ' + str(hmean(auc)))
+        print('harmonic mean of pAUCs: ' + str(hmean(pauc)))
+        print('harmonic mean of F1-EVs: ' + str(hmean(f1ev)))
+        print('harmonic mean of bounded F1-EVs: ' + str(hmean(f1ev_bounded)))
+        print('threshold-dependent metrics:')
+        print('harmonic mean of submitted F1-scores: ' + str(hmean(subf1)))
+        print('harmonic mean of estimated F1-scores: ' + str(hmean(estf1)))
+        print('harmonic mean of optimal F1-score: ' + str(hmean(maxf1)))
+    return np.array([auc, pauc, f1ev, f1ev_bounded, subf1, estf1, maxf1])
 
 
 if __name__ == "__main__":
@@ -89,9 +99,36 @@ if __name__ == "__main__":
     parser.add_argument('-pred_files_path', type=str, help='path to the folder containing the prediction files')
     parser.add_argument('-ref_files_path', type=str, help='path to the folder containing the ground truth files')
     args = parser.parse_args()
+
+    # compute all metrics for all files
+    results = []
     for team_dir in tqdm(os.listdir(args.pred_files_path)):
-        print(team_dir)
         for submission_dir in os.listdir(args.pred_files_path + '/' + team_dir + '/'):
-            print('############')
-            print(submission_dir)
-            compute_performance(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path)
+            results.append(compute_performance(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path))
+    results = np.array(results)
+
+    # flatten and remove submissions without threshold/F1-score
+    results = np.swapaxes(results, 1, 2)
+    results = np.reshape(results, (-1, results.shape[1]), order='F')
+    #results = hmean(results, axis=-1)
+    results = results[results[:, 4]>0]
+
+    # output results
+    print('Pearson correlation coefficients:')
+    print('AUC-ROC vs. F1-EV: ' + str(np.round(pearsonr(results[:,0], results[:,2])[0], 3)))
+    print('AUC-ROC vs. F1-EV_bounded: ' + str(np.round(pearsonr(results[:,0], results[:,3])[0], 3)))
+    print('F1-EV vs. F1-EV_bounded: ' + str(np.round(pearsonr(results[:,2], results[:,3])[0], 3)))
+    print('AUC-ROC vs. F1 score (as submitted): ' + str(np.round(pearsonr(results[:,0], results[:,-3])[0], 3)))
+    print('F1-EV vs. F1 score (as submitted): ' + str(np.round(pearsonr(results[:,2], results[:,-3])[0], 3)))
+    print('F1-EV_bounded vs. F1 score (as submitted): ' + str(np.round(pearsonr(results[:,3], results[:,-3])[0], 3)))
+    print('AUC-ROC vs. optimal F1 score: ' + str(np.round(pearsonr(results[:,0], results[:,-1])[0], 3)))
+    print('F1-EV vs. optimal F1 score: ' + str(np.round(pearsonr(results[:,2], results[:,-1])[0], 3)))
+    print('F1-EV_bounded vs. optimal F1 score: ' + str(np.round(pearsonr(results[:,3], results[:,-1])[0], 3)))
+
+    """
+    no correlation: 0 to 0.3
+    weak correlation: 0.3 to 0.5
+    moderate correlation: 0.5 to 0.7
+    high correlation: 0.7 to 0.9
+    very high correlation: 0.9 to 1
+    """
