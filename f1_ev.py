@@ -23,9 +23,9 @@ def f1_ev(y_true, pred, bounded=False, orig_threshold=None):
         anomalous_scores = pred[y_true==1]
         std_normal = np.std(normal_scores)
         # define bounds for threshold estimated with standard deviation
-        alpha = 0.25
-        est_upper_bound = np.max([orig_threshold, np.mean(normal_scores)]) + alpha*std_normal
-        est_lower_bound = np.min([orig_threshold, np.mean(normal_scores)]) - alpha*std_normal
+        alpha = 0.2513
+        est_upper_bound = orig_threshold + alpha*std_normal
+        est_lower_bound = np.mean(normal_scores) - alpha*std_normal
         thresholds = np.concatenate([np.expand_dims(est_lower_bound, axis=0), thresholds[(thresholds<est_upper_bound)*(thresholds>est_lower_bound)], np.expand_dims(est_upper_bound, axis=0)], axis=0)
     # compute f1-scores
     f1_scores = np.zeros(thresholds.shape)
