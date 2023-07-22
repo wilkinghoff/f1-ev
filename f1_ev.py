@@ -110,7 +110,6 @@ if __name__ == "__main__":
         for submission_dir in os.listdir(args.pred_files_path + '/' + team_dir + '/'):
             results.append(compute_performance(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path))
     results = np.array(results)
-    print(results.shape)
 
     # remove submissions without threshold/F1-score
     auc = np.ravel(results[:,0])
