@@ -27,9 +27,7 @@ def f1_ev(y_true, pred, bounded=False, orig_threshold=None):
     thresholds = np.unique(pred)
     if bounded:
         normal_scores = pred[y_true==0]
-        anomalous_scores = pred[y_true==1]
         std_normal = np.std(normal_scores)
-        std_anomalous = np.std(anomalous_scores)
         # define bounds for threshold estimated with standard deviation
         alpha = 0.2515
         est_upper_bound = orig_threshold+alpha*std_normal
@@ -112,14 +110,15 @@ if __name__ == "__main__":
         for submission_dir in os.listdir(args.pred_files_path + '/' + team_dir + '/'):
             results.append(compute_performance(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path))
     results = np.array(results)
+    print(results.shape)
 
     # remove submissions without threshold/F1-score
-    auc = np.ravel(results[:,:,0])
-    pauc = np.ravel(results[:,:,1])
-    f1ev = np.ravel(results[:,:,2])
-    f1ev_bounded = np.ravel(results[:,:,3])
-    f1_sub = np.ravel(results[:,:,4])
-    f1_opt = np.ravel(results[:,:,5])
+    auc = np.ravel(results[:,0])
+    pauc = np.ravel(results[:,1])
+    f1ev = np.ravel(results[:,2])
+    f1ev_bounded = np.ravel(results[:,3])
+    f1_sub = np.ravel(results[:,4])
+    f1_opt = np.ravel(results[:,5])
     valid = f1_sub>0
     auc = auc[valid]
     pauc = pauc[valid]
