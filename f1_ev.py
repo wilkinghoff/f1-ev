@@ -7,6 +7,13 @@ import os
 from scipy.stats import hmean, gamma, pearsonr
 
 
+def store_results(x1, x2, filepath):
+    res = pd.DataFrame()
+    res['x1'], res['x2'] = [x1, x2]
+    res.to_csv(filepath, encoding='utf-8', sep=' ', index=False, header=True, line_terminator='\n')
+    return
+
+
 def estimate_decision_threshold(pred, dec):
     thresholds = pred[:-1] + np.diff(pred)/2
     similarities = np.zeros(thresholds.shape[0])
@@ -22,10 +29,11 @@ def f1_ev(y_true, pred, bounded=False, orig_threshold=None):
         normal_scores = pred[y_true==0]
         anomalous_scores = pred[y_true==1]
         std_normal = np.std(normal_scores)
+        std_anomalous = np.std(anomalous_scores)
         # define bounds for threshold estimated with standard deviation
-        alpha = 0.2513
-        est_upper_bound = orig_threshold + alpha*std_normal
-        est_lower_bound = np.mean(normal_scores) - alpha*std_normal
+        alpha = 0.2515
+        est_upper_bound = orig_threshold+alpha*std_normal
+        est_lower_bound = np.mean(normal_scores)-alpha*std_normal
         thresholds = np.concatenate([np.expand_dims(est_lower_bound, axis=0), thresholds[(thresholds<est_upper_bound)*(thresholds>est_lower_bound)], np.expand_dims(est_upper_bound, axis=0)], axis=0)
     # compute f1-scores
     f1_scores = np.zeros(thresholds.shape)
@@ -72,7 +80,6 @@ def compute_performance(pred_files_path, ref_files_path, verbose=False):
             # estimate threshold and compute F1-score
             #threshold = estimate_decision_threshold(pred, dec)  # this would be treshold-dependent
             threshold = optimal_threshold  # to have a threshold-independent metric!
-            estf1[k] = metrics.f1_score(y_true, pred>threshold)
             # compute bounded F1-EV
             f1ev_bounded[k], _, _ = f1_ev(y_true, pred, bounded=True, orig_threshold=threshold)
             # submitted F1-score
@@ -88,9 +95,8 @@ def compute_performance(pred_files_path, ref_files_path, verbose=False):
         print('harmonic mean of bounded F1-EVs: ' + str(hmean(f1ev_bounded)))
         print('threshold-dependent metrics:')
         print('harmonic mean of submitted F1-scores: ' + str(hmean(subf1)))
-        print('harmonic mean of estimated F1-scores: ' + str(hmean(estf1)))
         print('harmonic mean of optimal F1-score: ' + str(hmean(maxf1)))
-    return np.array([auc, pauc, f1ev, f1ev_bounded, subf1, estf1, maxf1])
+    return np.array([auc, pauc, f1ev, f1ev_bounded, subf1, maxf1])
 
 
 if __name__ == "__main__":
@@ -107,23 +113,32 @@ if __name__ == "__main__":
             results.append(compute_performance(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path))
     results = np.array(results)
 
-    # flatten and remove submissions without threshold/F1-score
-    results = np.swapaxes(results, 1, 2)
-    results = np.reshape(results, (-1, results.shape[1]), order='F')
-    #results = hmean(results, axis=-1)
-    results = results[results[:, 4]>0]
+    # remove submissions without threshold/F1-score
+    auc = np.ravel(results[:,:,0])
+    pauc = np.ravel(results[:,:,1])
+    f1ev = np.ravel(results[:,:,2])
+    f1ev_bounded = np.ravel(results[:,:,3])
+    f1_sub = np.ravel(results[:,:,4])
+    f1_opt = np.ravel(results[:,:,5])
+    valid = f1_sub>0
+    auc = auc[valid]
+    pauc = pauc[valid]
+    f1ev = f1ev[valid]
+    f1ev_bounded = f1ev_bounded[valid]
+    f1_sub = f1_sub[valid]
+    f1_opt = f1_opt[valid]
 
     # output results
     print('Pearson correlation coefficients:')
-    print('AUC-ROC vs. F1-EV: ' + str(np.round(pearsonr(results[:,0], results[:,2])[0], 3)))
-    print('AUC-ROC vs. F1-EV_bounded: ' + str(np.round(pearsonr(results[:,0], results[:,3])[0], 3)))
-    print('F1-EV vs. F1-EV_bounded: ' + str(np.round(pearsonr(results[:,2], results[:,3])[0], 3)))
-    print('AUC-ROC vs. F1 score (as submitted): ' + str(np.round(pearsonr(results[:,0], results[:,-3])[0], 3)))
-    print('F1-EV vs. F1 score (as submitted): ' + str(np.round(pearsonr(results[:,2], results[:,-3])[0], 3)))
-    print('F1-EV_bounded vs. F1 score (as submitted): ' + str(np.round(pearsonr(results[:,3], results[:,-3])[0], 3)))
-    print('AUC-ROC vs. optimal F1 score: ' + str(np.round(pearsonr(results[:,0], results[:,-1])[0], 3)))
-    print('F1-EV vs. optimal F1 score: ' + str(np.round(pearsonr(results[:,2], results[:,-1])[0], 3)))
-    print('F1-EV_bounded vs. optimal F1 score: ' + str(np.round(pearsonr(results[:,3], results[:,-1])[0], 3)))
+    print('AUC-ROC vs. F1-EV: ' + str(np.round(pearsonr(auc, f1ev)[0], 3)))
+    print('AUC-ROC vs. F1-EV_bounded: ' + str(np.round(pearsonr(auc, f1ev_bounded)[0], 3)))
+    print('F1-EV vs. F1-EV_bounded: ' + str(np.round(pearsonr(f1ev, f1ev_bounded)[0], 3)))
+    print('AUC-ROC vs. F1 score (as submitted): ' + str(np.round(pearsonr(auc, f1_sub)[0], 3)))
+    print('F1-EV vs. F1 score (as submitted): ' + str(np.round(pearsonr(f1ev, f1_sub)[0], 3)))
+    print('F1-EV_bounded vs. F1 score (as submitted): ' + str(np.round(pearsonr(f1ev_bounded, f1_sub)[0], 3)))
+    print('AUC-ROC vs. optimal F1 score: ' + str(np.round(pearsonr(auc, f1_opt)[0], 3)))
+    print('F1-EV vs. optimal F1 score: ' + str(np.round(pearsonr(f1ev, f1_opt)[0], 3)))
+    print('F1-EV_bounded vs. optimal F1 score: ' + str(np.round(pearsonr(f1ev_bounded, f1_opt)[0], 3)))
 
     """
     no correlation: 0 to 0.3
@@ -132,3 +147,14 @@ if __name__ == "__main__":
     high correlation: 0.7 to 0.9
     very high correlation: 0.9 to 1
     """
+
+    # store results
+    store_results(auc, f1ev, 'auc-roc_vs_f1-ev.txt')
+    store_results(auc, f1ev_bounded, 'auc-roc_vs_f1-ev-bounded.txt')
+    store_results(f1ev, f1ev_bounded, 'f1-ev_vs_f1-ev-bounded.txt')
+    store_results(auc, f1_sub, 'auc-roc_vs_f1-sub.txt')
+    store_results(f1ev, f1_sub, 'f1-ev_vs_f1-sub.txt')
+    store_results(f1ev_bounded, f1_sub, 'f1-ev-bounded_vs_f1-sub.txt')
+    store_results(auc, f1_opt, 'auc-roc_vs_f1-opt.txt')
+    store_results(f1ev, f1_opt, 'f1-ev_vs_f1-opt.txt')
+    store_results(f1ev_bounded, f1_opt, 'f1-ev-bounded_vs_f1-opt.txt')
