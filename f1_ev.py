@@ -134,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument('-pred_files_path', type=str, help='path to the folder containing the prediction files')
     parser.add_argument('-ref_files_path', type=str, help='path to the folder containing the ground truth files')
     args = parser.parse_args()
-
+    """
     # compute bounded F1-EV for different values of alpha
     alpha_results = []
     for team_dir in tqdm(os.listdir(args.pred_files_path)):
@@ -143,7 +143,7 @@ if __name__ == "__main__":
             alpha_results.append(alpha_result)
     alpha_results = np.mean(np.concatenate(alpha_results), axis=0)
     store_results(alphas, alpha_results, 'alpha_vs_f1-ev-bounded.txt')
-
+    """
     # compute all metrics for all files
     results = []
     for team_dir in tqdm(os.listdir(args.pred_files_path)):
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     f1ev_bounded = np.ravel(results[:,3])
     f1_sub = np.ravel(results[:,4])
     f1_opt = np.ravel(results[:,5])
-    """
+
     valid = f1_sub>0
     auc = auc[valid]
     pauc = pauc[valid]
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     f1ev_bounded = f1ev_bounded[valid]
     f1_sub = f1_sub[valid]
     f1_opt = f1_opt[valid]
-    """
+
     # output results
     print('Pearson correlation coefficients:')
     print('AUC-ROC vs. F1-EV: ' + str(np.round(pearsonr(auc, f1ev)[0], 3)))
