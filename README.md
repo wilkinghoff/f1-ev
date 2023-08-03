@@ -5,7 +5,7 @@ Implementation of the threshold-independent performance measure F1-EV and its bo
 ## Instructions
 
 Just run the script and pass the folders containing the predictions and the folder containing the labels as arguments:
-python f1_ev.py -pred_files_path ./dcase-2023/teams/ -ref_files_path ./dcase-2023/ground_truth_data/
+python f1_ev.py -pred_files_path ./dcase-2023/teams/ -ref_files_path ./dcase-2023/ground_truth_data/ -alpha_test 0
 
 ## Reference
 
