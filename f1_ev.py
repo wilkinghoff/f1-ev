@@ -58,7 +58,7 @@ def test_alpha_values(pred_files_path, ref_files_path):
     # load ground truth
     ref_files = os.listdir(ref_files_path)
 
-    alphas = np.arange(0.025, 1.025, 0.025)
+    alphas = np.arange(0.025, 2.025, 0.025)
     f1ev_bounded = np.zeros((len(pred_files), alphas.shape[0]))
     estf1 = np.zeros(len(pred_files))
     subf1 = np.zeros(len(pred_files))
@@ -110,7 +110,7 @@ def compute_performance(pred_files_path, ref_files_path, verbose=False):
             #threshold = estimate_decision_threshold(pred, dec)  # this would be treshold-dependent
             threshold = optimal_threshold  # to have a threshold-independent metric!
             # compute bounded F1-EV
-            f1ev_bounded[k], _, _ = f1_ev(y_true, pred, bounded=True, orig_threshold=threshold)
+            f1ev_bounded[k], _, _ = f1_ev(y_true, pred, bounded=True, orig_threshold=threshold, alpha=0.25)
             # submitted F1-score
             subf1[k] = metrics.f1_score(y_true, dec)
     if verbose:
@@ -134,16 +134,16 @@ if __name__ == "__main__":
     parser.add_argument('-pred_files_path', type=str, help='path to the folder containing the prediction files')
     parser.add_argument('-ref_files_path', type=str, help='path to the folder containing the ground truth files')
     args = parser.parse_args()
-    """
+    #"""
     # compute bounded F1-EV for different values of alpha
     alpha_results = []
     for team_dir in tqdm(os.listdir(args.pred_files_path)):
         for submission_dir in os.listdir(args.pred_files_path + '/' + team_dir + '/'):
             alphas, alpha_result = test_alpha_values(args.pred_files_path + '/' + team_dir + '/' + submission_dir + '/', args.ref_files_path)
             alpha_results.append(alpha_result)
-    alpha_results = np.mean(np.concatenate(alpha_results), axis=0)
-    store_results(alphas, alpha_results, 'alpha_vs_f1-ev-bounded.txt')
-    """
+    alpha_results = np.concatenate(alpha_results)
+
+    #"""
     # compute all metrics for all files
     results = []
     for team_dir in tqdm(os.listdir(args.pred_files_path)):
@@ -166,6 +166,16 @@ if __name__ == "__main__":
     f1ev_bounded = f1ev_bounded[valid]
     f1_sub = f1_sub[valid]
     f1_opt = f1_opt[valid]
+    alpha_results = alpha_results[valid]
+
+    # compute PCCs for different alphas
+    alpha_auc_pccs = np.zeros(alpha_results.shape[-1])
+    alpha_f1_opt_pccs = np.zeros(alpha_results.shape[-1])
+    alpha_f1_sub_pccs = np.zeros(alpha_results.shape[-1])
+    for k in np.arange(alpha_auc_pccs.shape[-1]):
+        alpha_auc_pccs[k] = pearsonr(auc, alpha_results[:,k])[0]
+        alpha_f1_opt_pccs[k] = pearsonr(f1_opt, alpha_results[:,k])[0]
+        alpha_f1_sub_pccs[k] = pearsonr(f1_sub, alpha_results[:,k])[0]
 
     # output results
     print('Pearson correlation coefficients:')
@@ -197,3 +207,7 @@ if __name__ == "__main__":
     store_results(auc, f1_opt, 'auc-roc_vs_f1-opt.txt')
     store_results(f1ev, f1_opt, 'f1-ev_vs_f1-opt.txt')
     store_results(f1ev_bounded, f1_opt, 'f1-ev-bounded_vs_f1-opt.txt')
+    store_results(alphas, np.mean(alpha_results, axis=0), 'alpha_vs_f1-ev-bounded.txt')
+    store_results(alphas, alpha_auc_pccs, 'alpha_vs_pcc_auc.txt')
+    store_results(alphas, alpha_f1_opt_pccs, 'alpha_vs_pcc_f1-opt.txt')
+    store_results(alphas, alpha_f1_sub_pccs, 'alpha_vs_pcc_f1-sub.txt')
