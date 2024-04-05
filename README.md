@@ -13,9 +13,11 @@ python f1_ev.py -pred_files_path ./dcase-2023/teams/ -ref_files_path ./dcase-202
 
 When reusing (parts of) the code, a reference to the following paper would be appreciated:
 
-@unpublished{wilkinghoff2023f1-ev,
+@inproceedings{wilkinghoff2024f1-ev,
   author = {Wilkinghoff, Kevin and Imoto, Keisuke},
-  title  = {F1-EV Score: Measuring the Likelihood of Estimating a Good Decision Threshold for Semi-Supervised Anomaly Detection},
-  note   = {arXiv:2312.09143},
-  year   = {2023}
+  title = {{F1-EV} Score: Measuring the Likelihood of Estimating a Good Decision Threshold for Semi-Supervised Anomaly Detection},
+  booktitle = {International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+  year = {2024},
+  publisher={IEEE},
+  pages={256--260}
 }
